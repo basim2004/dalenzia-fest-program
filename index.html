@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dalenzia Fest Admin</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        :root { --primary: #0f172a; --accent: #f59e0b; --bg: #f1f5f9; --white: #ffffff; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+        body { background-color: var(--bg); padding-bottom: 100px; }
+
+        header { background: linear-gradient(135deg, #1e3a8a, #0f172a); color: white; padding: 25px; text-align: center; border-radius: 0 0 25px 25px; position: relative; }
+        .edit-mode-btn { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; padding: 5px 15px; border-radius: 20px; cursor: pointer; font-size: 0.8rem; }
+        .save-btn { display:none; position: fixed; bottom: 80px; right: 20px; background: #16a34a; color: white; padding: 15px 25px; border-radius: 50px; border: none; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 200; animation: bounce 2s infinite; }
+        
+        [contenteditable="true"] { border: 1px dashed #f59e0b; padding: 2px; background: rgba(255,255,0,0.1); }
+        .venue-badge { background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin-top: 10px; display: inline-block; }
+
+        .nav-container { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px; border-top: 1px solid #ccc; z-index: 100; }
+        .nav-btn { border: none; background: none; font-size: 0.8rem; color: #64748b; cursor: pointer; }
+        .nav-btn.active { color: #1e3a8a; font-weight: bold; }
+        .nav-icon { display: block; font-size: 1.5rem; margin-bottom: 2px; }
+
+        .section { display: none; padding: 20px; }
+        .section.active { display: block; }
+
+        .program-card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; border-left: 5px solid var(--accent); display: flex; justify-content: space-between; align-items: center; position: relative; }
+        .program-time { font-weight: bold; color: #1e3a8a; min-width: 80px; }
+        .program-cat { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+        
+        .admin-controls { display: none; gap: 5px; position: absolute; right: 5px; top: 5px; }
+        .btn-del { background: #ef4444; color: white; border: none; width: 25px; height: 25px; border-radius: 50%; cursor: pointer; }
+        .btn-add { display:none; width: 100%; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 10px; margin-top: 10px; cursor: pointer; font-weight: bold; text-align: center; }
+
+        .day-toggle { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+        .day-btn { padding: 8px 20px; border: 1px solid #1e3a8a; background: transparent; color: #1e3a8a; border-radius: 20px; cursor: pointer; }
+        .day-btn.active { background: #1e3a8a; color: white; }
+
+        .print-btn {
+            display: block; width: 100%; max-width: 200px; margin: 0 auto 20px auto;
+            background-color: #ef4444; color: white; border: none; padding: 10px 15px;
+            border-radius: 8px; font-weight: bold; cursor: pointer; text-align: center;
+            box-shadow: 0 2px 5px rgba(239, 68, 68, 0.3);
+        }
+        .print-btn:active { transform: scale(0.98); }
+
+        /* --- SCROLLING NEWS STYLES --- */
+        .news-ticker-container { width: 100%; background-color: var(--accent); overflow: hidden; white-space: nowrap; padding: 8px 0; border-bottom: 3px solid #1e3a8a; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .news-text { display: inline-block; padding-left: 100%; animation: scroll-left 20s linear infinite; font-weight: bold; color: #000; font-size: 1rem; }
+        [contenteditable="true"] .news-text, .news-text[contenteditable="true"] { animation: none; padding-left: 10px; white-space: normal; }
+        @keyframes scroll-left { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+        /* --- CLOCK & TIMER WIDGET STYLES --- */
+        .dashboard-panel {
+            background: white; margin: 15px 20px 0 20px; padding: 15px;
+            border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            text-align: center; display: flex; flex-direction: column; gap: 15px;
+        }
+        .live-clock {
+            font-size: 2rem; font-weight: 800; color: #1e3a8a;
+            font-family: 'Courier New', monospace; letter-spacing: -1px;
+        }
+        .timer-wrapper {
+            border-top: 1px solid #eee; padding-top: 10px;
+        }
+        .timer-display {
+            font-size: 2.5rem; font-weight: bold; color: #333;
+            font-family: monospace; margin: 5px 0;
+        }
+        .timer-display.time-up { color: #ef4444; animation: blink 1s infinite; }
+        
+        .timer-controls { display: flex; gap: 5px; justify-content: center; align-items: center; }
+        .timer-input { width: 60px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 5px; text-align: center; font-size: 1rem; }
+        .btn-timer { padding: 8px 15px; border: none; border-radius: 5px; color: white; cursor: pointer; font-weight: bold; }
+        .btn-start { background: #16a34a; }
+        .btn-stop { background: #ea580c; }
+        .btn-reset { background: #64748b; }
+
+        @keyframes blink { 50% { opacity: 0.5; } }
+        @keyframes bounce { 0%, 20%, 50%, 80%, 100% {transform: translateY(0);} 40% {transform: translateY(-10px);} 60% {transform: translateY(-5px);} }
+    </style>
+</head>
+<body onload="startLiveClock()">
+
+    <header id="mainHeader">
+        <button onclick="toggleEditMode()" class="edit-mode-btn"><i class="fas fa-edit"></i> Edit Site</button>
+        <h1 id="festTitle" class="editable-text">DALENZIA FEST '25</h1>
+        <p id="festSubTitle" class="editable-text">Taqwa Masjid, Ayiroor</p> 
+        <div id="festVenue" class="venue-badge editable-text">📍 Venue: Masjidul Livah, Kandubazar</div>
+        <p id="festDate" class="editable-text" style="font-size: 0.8rem; margin-top: 8px; opacity: 0.8;">🗓️ Dec 27 & 28</p>
+    </header>
+
+    <div class="news-ticker-container">
+        <div class="news-text editable-text">📢 Welcome to Dalenzia Fest '25! Check results and schedule here. Lunch break at 1:00 PM.</div>
+    </div>
+    
+    <div class="dashboard-panel">
+        <div>
+            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 5px;">CURRENT TIME</div>
+            <div class="live-clock" id="liveClock">00:00:00 PM</div>
+        </div>
+        
+        <div class="timer-wrapper">
+            <div style="font-size: 0.8rem; color: #64748b;">STAGE TIMER</div>
+            <div class="timer-display" id="timerDisplay">00:00</div>
+            <div class="timer-controls">
+                <input type="number" id="timerInput" class="timer-input" placeholder="Min" min="1">
+                <button class="btn-timer btn-start" onclick="startTimer()">Start</button>
+                <button class="btn-timer btn-stop" onclick="stopTimer()">Stop</button>
+                <button class="btn-timer btn-reset" onclick="resetTimer()">Reset</button>
+            </div>
+        </div>
+    </div>
+    <button onclick="downloadNewFile()" class="save-btn" id="saveBtn">💾 Save & Download App</button>
+
+    <div id="stage1" class="section active">
+        <h2 style="text-align:center; color:#1e3a8a; margin-bottom:15px;">🎤 Stage 1 (On Stage)</h2>
+        
+        <div class="day-toggle">
+            <button class="day-btn active" onclick="showList('s1d1', this)">Day 1</button>
+            <button class="day-btn" onclick="showList('s1d2', this)">Day 2</button>
+        </div>
+
+        <button onclick="downloadPDF()" class="print-btn">🖨️ Print Schedule</button>
+
+        <div id="s1d1" class="program-list">
+            <div class="program-card">
+                <div class="program-time editable-text">08:30 AM</div>
+                <div class="program-details">
+                    <h3 class="editable-text">Moulid Parayanam</h3>
+                    <span class="program-cat editable-text">General</span>
+                </div>
+                <div class="admin-controls"><button class="btn-del" onclick="removeRow(this)">×</button></div>
+            </div>
+            <div class="program-card">
+                <div class="program-time editable-text">09:30 AM</div>
+                <div class="program-details">
+                    <h3 class="editable-text">Tarteel</h3>
+                    <span class="program-cat editable-text">Minor</span>
+                </div>
+                <div class="admin-controls"><button class="btn-del" onclick="removeRow(this)">×</button></div>
+            </div>
+        </div>
+        <button class="btn-add" onclick="addRow('s1d1')">+ Add New Program</button>
+
+        <div id="s1d2" class="program-list" style="display:none;">
+            <div class="program-card">
+                <div class="program-time editable-text">08:00 AM</div>
+                <div class="program-details">
+                    <h3 class="editable-text">Ibarath Reading</h3>
+                    <span class="program-cat editable-text">Sub Junior</span>
+                </div>
+                <div class="admin-controls"><button class="btn-del" onclick="removeRow(this)">×</button></div>
+            </div>
+        </div>
+        <button class="btn-add" onclick="addRow('s1d2')" style="display:none;">+ Add New Program</button>
+    </div>
+
+    <div id="stage2" class="section">
+        <h2 style="text-align:center; color:#1e3a8a; margin-bottom:15px;">🎤 Stage 2 (On Stage)</h2>
+        <div class="day-toggle">
+            <button class="day-btn active" onclick="showList('s2d1', this)">Day 1</button>
+            <button class="day-btn" onclick="showList('s2d2', this)">Day 2</button>
+        </div>
+
+        <button onclick="downloadPDF()" class="print-btn">🖨️ Print Schedule</button>
+
+        <div id="s2d1" class="program-list">
+            <div class="program-card">
+                <div class="program-time editable-text">09:00 AM</div>
+                <div class="program-details">
+                    <h3 class="editable-text">Item Name</h3>
+                    <span class="program-cat editable-text">Category</span>
+                </div>
+                <div class="admin-controls"><button class="btn-del" onclick="removeRow(this)">×</button></div>
+            </div>
+        </div>
+        <button class="btn-add" onclick="addRow('s2d1')">+ Add New Program</button>
+
+        <div id="s2d2" class="program-list" style="display:none;">
+            <div class="program-card">
+                <div class="program-time editable-text">09:00 AM</div>
+                <div class="program-details">
+                    <h3 class="editable-text">Item Name</h3>
+                    <span class="program-cat editable-text">Category</span>
+                </div>
+                <div class="admin-controls"><button class="btn-del" onclick="removeRow(this)">×</button></div>
+            </div>
+        </div>
+        <button class="btn-add" onclick="addRow('s2d2')" style="display:none;">+ Add New Program</button>
+    </div>
+
+    <nav class="nav-container">
+        <button class="nav-btn active" onclick="switchTab('stage1', this)">
+            <span class="nav-icon">🎤</span>Stage 1
+        </button>
+        <button class="nav-btn" onclick="switchTab('stage2', this)">
+            <span class="nav-icon">🎤</span>Stage 2
+        </button>
+    </nav>
+
+    <script>
+        let isEditMode = false;
+
+        // --- CLOCK AND TIMER LOGIC ---
+        function startLiveClock() {
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('liveClock').innerText = now.toLocaleTimeString();
+            }, 1000);
+        }
+
+        let timerInterval;
+        let totalSeconds = 0;
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            const input = document.getElementById('timerInput');
+            const display = document.getElementById('timerDisplay');
+            
+            // Only set new time if totalSeconds is 0 (fresh start)
+            if (totalSeconds === 0 && input.value) {
+                totalSeconds = parseInt(input.value) * 60;
+            }
+
+            if(totalSeconds <= 0) {
+                alert("Please enter minutes");
+                return;
+            }
+
+            display.classList.remove('time-up');
+            
+            timerInterval = setInterval(() => {
+                if (totalSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    display.innerText = "00:00";
+                    display.classList.add('time-up');
+                    // Optional: play sound here
+                } else {
+                    totalSeconds--;
+                    let m = Math.floor(totalSeconds / 60);
+                    let s = totalSeconds % 60;
+                    display.innerText = `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function resetTimer() {
+            stopTimer();
+            totalSeconds = 0;
+            document.getElementById('timerDisplay').innerText = "00:00";
+            document.getElementById('timerDisplay').classList.remove('time-up');
+            document.getElementById('timerInput').value = "";
+        }
+        // -----------------------------
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            document.querySelectorAll('.editable-text').forEach(el => {
+                el.contentEditable = isEditMode;
+            });
+            document.querySelectorAll('.admin-controls').forEach(el => el.style.display = isEditMode ? 'block' : 'none');
+            document.querySelectorAll('.btn-add').forEach(el => {
+                let parentListId = el.previousElementSibling.id;
+                let parentList = document.getElementById(parentListId);
+                if(parentList.style.display !== 'none' && isEditMode) {
+                    el.style.display = 'block';
+                } else {
+                    el.style.display = 'none';
+                }
+            });
+            document.getElementById('saveBtn').style.display = isEditMode ? 'block' : 'none';
+        }
+
+        function removeRow(btn) {
+            if(confirm('Delete this item?')) {
+                btn.closest('.program-card').remove();
+            }
+        }
+
+        function addRow(listId) {
+            let list = document.getElementById(listId);
+            let newCard = `
+            <div class="program-card">
+                <div class="program-time editable-text" contenteditable="true">00:00 AM</div>
+                <div class="program-details">
+                    <h3 class="editable-text" contenteditable="true">New Item</h3>
+                    <span class="program-cat editable-text" contenteditable="true">Category</span>
+                </div>
+                <div class="admin-controls" style="display:block;"><button class="btn-del" onclick="removeRow(this)">×</button></div>
+            </div>`;
+            list.insertAdjacentHTML('beforeend', newCard);
+        }
+
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            btn.classList.add('active');
+        }
+
+        function showList(listId, btn) {
+            let section = btn.closest('.section');
+            section.querySelectorAll('.program-list').forEach(el => el.style.display = 'none');
+            section.querySelectorAll('.btn-add').forEach(el => el.style.display = 'none');
+            section.querySelectorAll('.day-btn').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(listId).style.display = 'block';
+            btn.classList.add('active');
+
+            if(isEditMode) {
+                let addBtn = document.getElementById(listId).nextElementSibling;
+                if(addBtn && addBtn.classList.contains('btn-add')) {
+                    addBtn.style.display = 'block';
+                }
+            }
+        }
+
+        function downloadPDF() {
+            if(isEditMode) toggleEditMode();
+
+            const activeSection = document.querySelector('.section.active');
+            let visibleList = null;
+            activeSection.querySelectorAll('.program-list').forEach(list => {
+                if (list.offsetParent !== null) visibleList = list;
+            });
+
+            if (!visibleList) {
+                alert("Please select a day first!");
+                return;
+            }
+
+            let stageName = activeSection.querySelector('h2').innerText;
+            let activeDayBtn = activeSection.querySelector('.day-btn.active').innerText;
+
+            let pdfContainer = document.createElement('div');
+            
+            let headerClone = document.querySelector('header').cloneNode(true);
+            let editBtn = headerClone.querySelector('.edit-mode-btn');
+            if(editBtn) editBtn.remove();
+            
+            headerClone.style.background = "#1e3a8a"; 
+            headerClone.style.color = "white";
+            headerClone.style.padding = "20px";
+            headerClone.style.textAlign = "center";
+            headerClone.style.borderRadius = "0";
+
+            let subHeader = document.createElement('div');
+            subHeader.innerHTML = `
+                <h3 style="margin:0; color:#333; font-size:18px;">${stageName}</h3>
+                <p style="margin:5px 0 0 0; color:#666; font-weight:bold;">${activeDayBtn}</p>
+            `;
+            subHeader.style.textAlign = "center";
+            subHeader.style.padding = "15px";
+            subHeader.style.background = "#e2e8f0";
+            subHeader.style.borderBottom = "2px solid #cbd5e1";
+
+            let listClone = visibleList.cloneNode(true);
+            listClone.style.padding = "20px";
+
+            let footer = document.createElement('div');
+            footer.innerHTML = `
+                <div style="margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; text-align: center; color: #666; font-size: 12px;">
+                    <p>Generated by Dalenzia Fest Official Web App</p>
+                </div>
+            `;
+
+            pdfContainer.appendChild(headerClone);
+            pdfContainer.appendChild(subHeader);
+            pdfContainer.appendChild(listClone);
+            pdfContainer.appendChild(footer);
+
+            var opt = {
+                margin: 0,
+                filename: 'Dalenzia_Schedule.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(pdfContainer).save();
+        }
+
+        function downloadNewFile() {
+            if(isEditMode) toggleEditMode();
+            let htmlContent = document.documentElement.outerHTML;
+            let blob = new Blob([htmlContent], {type: "text/html"});
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement("a");
+            a.href = url;
+            a.download = "index.html";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            alert("New file downloaded! Upload this 'index.html' to your site.");
+        }
+   
